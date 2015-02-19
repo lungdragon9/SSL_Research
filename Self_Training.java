@@ -11,6 +11,9 @@ public class Self_Training {
 
 	public static void main(String[] args)
 	{
+		/*
+		 * NOTE NEED TO CHANGE TO A DIFFERNT CLASSIFIER
+		 */
 		//Have to put it all ain the Try method to for alot of the WEKA functions
 		try {
 			Instances FullSet = (new DataSource("C:\\WorkSpace\\binary\\breast-w\\breast-w.arff")).getDataSet();
@@ -57,20 +60,20 @@ public class Self_Training {
 				
 				//Finds Confidence of best prediction
 				double Confidence[];
-				Confidence = Classifier.distributionForInstance(Unlab.instance(0));
+				Confidence = Classifier.distributionForInstance(Unlab.instance(location));
 				weka.core.Instance add = Unlab.instance(location);
 				
 				//Add Instance to training set
 				if(Confidence[0] > Confidence[1])
 				{
 					add.setClassValue("benign");
-					System.out.println("1");
+					//System.out.println("1");
 					TrainingSet.add(add);
 				}
 				else
 				{
 					add.setClassValue("malignant");
-					System.out.println("2");
+					//System.out.println("2");
 					TrainingSet.add(add);
 				}
 				
