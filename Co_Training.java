@@ -5,6 +5,7 @@ import java.util.Random;
 
 import weka.classifiers.Evaluation;
 import weka.classifiers.trees.J48;
+import weka.clusterers.EM;
 import weka.core.Instances;
 import weka.core.converters.ConverterUtils.DataSource;
 
@@ -13,7 +14,8 @@ public class Co_Training {
 	{
 		//Have to put it all ain the Try method to for allot of the WEKA functions
 		try {
-			Instances FullSet = (new DataSource("C:\\WorkSpace\\binary\\breast-w\\breast-w.arff")).getDataSet();
+			
+			Instances FullSet = (new DataSource("C:\\WorkSpace\\binary\\credit-g\\credit-g.arff")).getDataSet();
 			Random random = new Random(System.currentTimeMillis());
 			
 			//Randomize the fullset to allow better testing. Will later set seed to allow even testing among 3 methods
@@ -35,14 +37,19 @@ public class Co_Training {
 			
 			//Must designate the Class attribute
 			//Co-Training requires a split among the Attributes so 2 models are built and 2 sets for each set is needed
-			TrainingSet1.setClass(TrainingSet1.attribute("Class"));
-			TrainingSet2.setClass(TrainingSet2.attribute("Class"));
-			Unlab1.setClass(Unlab1.attribute("Class"));
-			Unlab2.setClass(Unlab2.attribute("Class"));
-			Unlab1Adder.setClass(Unlab1.attribute("Class"));
-			Unlab2Adder.setClass(Unlab2.attribute("Class"));
-			Testing1.setClass(Testing1.attribute("Class"));
-			Testing2.setClass(Testing2.attribute("Class"));
+			//TrainingSet1.setClass(TrainingSet1.attribute("Class"));
+			//TrainingSet2.setClass(TrainingSet2.attribute("Class"));
+			//Unlab1.setClass(Unlab1.attribute("Class"));
+			//Unlab2.setClass(Unlab2.attribute("Class"));
+			//Unlab1Adder.setClass(Unlab1.attribute("Class"));
+			//Unlab2Adder.setClass(Unlab2.attribute("Class"));
+			//Testing1.setClass(Testing1.attribute("Class"));
+			//Testing2.setClass(Testing2.attribute("Class"));
+			
+			EM em = new EM();
+			em.buildClusterer(TrainingSet1);
+			
+			System.out.println(em.toString());
 			
 			int AttributeOrder[];
 			AttributeOrder = RandOrder((TrainingSet1.numAttributes()-1),System.currentTimeMillis());
@@ -95,6 +102,7 @@ public class Co_Training {
 			System.out.println("done");
 			
 			int numUnlab = Unlab1.numInstances()/2;
+			
 			for(int i =0; i < numUnlab;i ++)
 			{
 				int BestLoc1 = FindBestInstance(Classifier1,Unlab1);
@@ -114,13 +122,17 @@ public class Co_Training {
 				//Add Instance to training set
 				if(Confidence1[0] > Confidence1[1])
 				{
-					add1.setClassValue("benign");
-					//System.out.println("1 _1");
+					double value = Classifier1.classifyInstance(Unlab1.instance(BestLoc1));
+					
+					add1.setClassValue(add1.classAttribute().value((int)value));
+					//System.out.println("1_1");
 					TrainingSet2.add(add1);
 				}
 				else
 				{
-					add1.setClassValue("malignant");
+					double value = Classifier1.classifyInstance(Unlab1.instance(BestLoc1));
+					
+					add1.setClassValue(add1.classAttribute().value((int)value));
 					//System.out.println("2_1");
 					TrainingSet2.add(add1);
 				}
@@ -128,19 +140,24 @@ public class Co_Training {
 				//Add Instance to training set
 				if(Confidence2[0] > Confidence2[1])
 				{
-					add2.setClassValue("benign");
+					double value = Classifier2.classifyInstance(Unlab2.instance(BestLoc2));
+					
+					add2.setClassValue(add2.classAttribute().value((int)value));
 					//System.out.println("1_2");
 					TrainingSet1.add(add2);
 				}
 				else
 				{
-					add2.setClassValue("malignant");
+					double value = Classifier2.classifyInstance(Unlab2.instance(BestLoc2));
+					
+					add2.setClassValue(add2.classAttribute().value((int)value));
 					//System.out.println("2_2");
 					TrainingSet1.add(add2);
 				}
 				
 				Unlab1.delete(BestLoc1);
 				Unlab2.delete(BestLoc2);
+				
 				Unlab2Adder.delete(BestLoc1);
 				Unlab1Adder.delete(BestLoc2);
 						
@@ -148,6 +165,31 @@ public class Co_Training {
 				//Rebuilds Trainingset
 				Classifier1.buildClassifier(TrainingSet1);
 				Classifier2.buildClassifier(TrainingSet2);
+				
+				//Used to evaluate the Classifier
+				eval_1 = new Evaluation(Testing1);			
+				eval_1.evaluateModel(Classifier1, Testing1);
+				
+				System.out.println("Model 1");
+				System.out.println("Num Training Instances " + Testing1.numInstances());
+				System.out.println("Correct: " + eval_1.correct());
+				System.out.println("Incorrect " + eval_1.incorrect());
+				System.out.println("Error rate " + eval_1.errorRate());
+				System.out.println("Pct Correct " +eval_1.pctCorrect());
+				System.out.println("done");			
+				
+				//Used to evaluate the Classifier
+				eval_2 = new Evaluation(Testing2);			
+				eval_2.evaluateModel(Classifier2, Testing2);
+				
+				System.out.println("Model 2");
+				System.out.println("Num Training Instances " + Testing2.numInstances());
+				System.out.println("Correct: " + eval_2.correct());
+				System.out.println("Incorrect " + eval_2.incorrect());
+				System.out.println("Error rate " + eval_2.errorRate());
+				System.out.println("Pct Correct " +eval_2.pctCorrect());
+				System.out.println("done");
+				
 			}
 			
 			//Used to evaluate the Classifier
@@ -234,6 +276,7 @@ public class Co_Training {
 		}
 		return set;
 	}
+	
 	//Removes the second half of attributes
 	public static Instances SplitSecondSet(int Order[], Instances set)
 	{

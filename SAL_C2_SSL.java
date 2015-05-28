@@ -1,19 +1,14 @@
 package SSL_Research;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
-
-import com.sun.xml.internal.bind.v2.runtime.unmarshaller.XsiNilLoader.Array;
 
 import weka.classifiers.Evaluation;
 import weka.classifiers.meta.Vote;
 import weka.classifiers.trees.J48;
 import weka.clusterers.DBScan;
-import weka.clusterers.forOPTICSAndDBScan.Databases.Database;
 import weka.core.Instance;
 import weka.core.Instances;
 import weka.core.converters.ConverterUtils.DataSource;
@@ -25,7 +20,7 @@ import weka.core.EuclideanDistance;;
 //Chebyshev- Chessboard distance
 //Minkowski- A combo of Euclidean and Manhatten
 //Note though I will only be working with pure numerical data though
-public class Semi_Active_Learning 
+public class SAL_C2_SSL 
 {
 	private static double NumSDAL = 1;
 	private static double NUMSDSSL = 1;
@@ -44,6 +39,7 @@ public class Semi_Active_Learning
 		boolean keepGoing = true;
 		
 		Instances FullSet = (new DataSource(DataSetLoc)).getDataSet();
+		Instances FullSetCopy = (new DataSource(DataSetLoc)).getDataSet();
 		Random random = new Random(seed);
 		FullSet.randomize(random);
 		
@@ -59,19 +55,36 @@ public class Semi_Active_Learning
 		//Remaining to Testing
 		Instances Testing = new Instances(FullSet,cutoff,(FullSet.numInstances()-10)-cutoff);
 		
+		double[] TrainingSetPlaces = null;
+		if(true)
+		{
+			FullSetCopy.deleteAttributeAt(FullSetCopy.attribute("class").index());
+			TrainingSetPlaces = TrainingSetFindiner(FullSetCopy,10);
+		}
+		
+		FullSet.setClass(FullSet.attribute("class"));
+		
+		TrainingSet.delete();
+		TrainingSet_2.delete();
+		
+		for(int i =0; i < TrainingSetPlaces.length; i ++)
+		{
+			System.out.println(FullSet.instance((int)TrainingSetPlaces[i]).classValue());
+			TrainingSet.add(FullSet.instance((int)TrainingSetPlaces[i]));
+			TrainingSet_2.add(FullSet.instance((int)TrainingSetPlaces[i]));
+		}
 		
 		File file_output = new File(OutputLoc);
         
         file_output.createNewFile();
         
         FileWriter output_write = new FileWriter(file_output.getAbsoluteFile());
-		BufferedWriter writer_output = new BufferedWriter(output_write);
         
-		TrainingSet.setClass(TrainingSet.attribute("surgery"));
-		TrainingSet_2.setClass(TrainingSet_2.attribute("surgery"));
+		TrainingSet.setClass(TrainingSet.attribute("class"));
+		TrainingSet_2.setClass(TrainingSet_2.attribute("class"));
 		//System.out.println(TrainingSet.instance(0));
-		Unlab.setClass(Unlab.attribute("surgery"));
-		Testing.setClass(Testing.attribute("surgery"));
+		Unlab.setClass(Unlab.attribute("class"));
+		Testing.setClass(Testing.attribute("class"));
 		
 		J48[] classifiers = new J48[2];
 		classifiers[0] = new J48();
@@ -708,4 +721,78 @@ public class Semi_Active_Learning
 		}
 		return num;
 	}
-}
+	
+	public static double[] TrainingSetFindiner(Instances dummy,int numAdd) throws Exception
+	{
+		Random random = new Random(seed);
+		double[] TrainingPlaces = new double[numAdd];
+		Instances TrainingSet = new Instances(dummy);
+		
+		TrainingSet.delete();
+		if(true)
+		{					
+			DBScan cluster = new DBScan();
+			cluster.setEpsilon(2.0);
+			cluster.buildClusterer(dummy);	
+			double[] clusters = cluster.returnClusterList();
+			int numClusters = cluster.numberOfClusters();
+			int numInClusters = countNumInCluster(clusters);
+			
+			if(numInClusters < numAdd)
+			{
+				numAdd = numInClusters;
+				TrainingPlaces = new double[(int) numAdd];
+				Arrays.fill(TrainingPlaces, -1);
+			}
+			
+			
+			if(numClusters != 0)
+			{
+				int numPerCluster = (int)numAdd/numClusters;
+				TrainingPlaces = new double[numPerCluster * numClusters];
+				Arrays.fill(TrainingPlaces, -1);
+				
+				int coutner =0; 
+
+					for(int i=0 ; i < numClusters; i ++)
+					{
+						for(int k=0; k < numPerCluster; k ++){
+							int randLoc = random.nextInt(dummy.numInstances());
+							
+							if(clusters[randLoc] == i)
+							{
+								if(SameCheck(TrainingPlaces,(double)randLoc))
+								{
+									TrainingPlaces[coutner++] = randLoc;
+								}
+								else
+								{
+									k--;
+								}
+							}
+							else
+							{
+								k--;
+							}
+						}
+
+					}
+					/*
+					Arrays.sort(TrainingPlaces);
+					
+					for(int i =TrainingPlaces.length-1; i >=0; i --)
+					{
+						Instance adder = dummy.instance((int)TrainingPlaces[i]);
+						//double value = classifiers[0].classifyInstance(Unlab.instance((int)NewAL[i]));
+
+						//adder.setClassValue(adder.classAttribute().value((int)value));
+						
+						TrainingSet.add(adder);
+					}
+					*/
+			}
+		}
+		return TrainingPlaces;
+	}
+	}
+
